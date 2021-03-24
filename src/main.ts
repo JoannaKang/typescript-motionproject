@@ -1,28 +1,74 @@
-import { PageComponent } from './components/page/page.js';
+import { Composable, PageComponent, PageItemComponent } from './components/page/page.js';
+import { Component } from './components/component.js'
 import { ImageComponent } from './components/item/image.js'
 import { NoteComponent } from './components/item/note.js';
 import { TodoComponent } from './components/item/todo.js';
 import { VideoComponent } from './components/item/video.js';
+import { InputDialog, MediaData, TextData } from './components/dialog/dialog.js';
+import { MediaSectionInput } from './components/dialog/input/media-input.js';
+import { TextSectionInput } from './components/dialog/input/text-input.js';
+
+type InputComponentConstructor<T = (MediaData | TextData) & Component> = {
+  new ():T;
+}
 
 class App {
-  private readonly page: PageComponent
-  constructor(appRoot: HTMLElement) {
-    this.page = new PageComponent();
+  private readonly page: Component & Composable;
+  constructor(appRoot: HTMLElement, private dialogRoot: HTMLElement) {
+    this.page = new PageComponent(PageItemComponent);
     this.page.attachTo(appRoot)
 
-    const video = new VideoComponent ('Video title', 'https://www.youtube.com/embed/nxKfi-6EtmY');
-    console.log(video)
-    video.attachTo(appRoot, 'beforeend');
-    const image = new ImageComponent ('Image title', 'https://picsum.photos/600/300');
-    image.attachTo(appRoot, 'beforeend')
-    const note = new NoteComponent('Note title', 'Note Body')
-    note.attachTo(appRoot, 'beforeend');
-    const todo = new TodoComponent ('Todo title', 'Todo Item')
-    todo.attachTo(appRoot, 'beforeend');
+    this.bindElementToDialog<MediaSectionInput>(
+      '.image-add-btn',
+      MediaSectionInput,
+      (input: MediaSectionInput) => new ImageComponent(input.title, input.url)
+    )
+
+    this.bindElementToDialog<MediaSectionInput>(
+      '.video-add-btn',
+      MediaSectionInput,
+      (input: MediaSectionInput) => new VideoComponent(input.title, input.url)
+    )
+
+    this.bindElementToDialog<TextSectionInput>(
+      '.note-add-btn',
+      TextSectionInput,
+      (input: TextSectionInput) => new NoteComponent(input.title, input.body)
+    )
+
+    this.bindElementToDialog<TextSectionInput>(
+      '.task-add-btn',
+      TextSectionInput,
+      (input: TextSectionInput) => new TodoComponent(input.title, input.body)
+    )
+  }
+
+  private bindElementToDialog<T extends MediaSectionInput | TextSectionInput>(
+    selector:string,
+    InputComponent: InputComponentConstructor<T>,
+    makeSection: (input: T) => Component
+  ) {
+    const element = document.querySelector(selector)! as HTMLElement;
+    element.addEventListener('click',  () => {
+      const dialog = new InputDialog();
+      const inputSection = new InputComponent();
+
+      dialog.addChild(inputSection); 
+      dialog.attachTo(this.dialogRoot);
+
+      dialog.setOnCloseListener(() => {
+        dialog.removeFrom(this.dialogRoot)
+      });
+      dialog.setOnSubmitListener(() => {
+        const content = makeSection(inputSection);
+        this.page.addChild(content)
+        dialog.removeFrom(this.dialogRoot)
+      });
+    })    
   }
 }
 
-new App(document.querySelector('.content-area')! as HTMLElement)
+new App(document.querySelector('.content-area')! as HTMLElement, document.body)
 
 // open modal popup
 
